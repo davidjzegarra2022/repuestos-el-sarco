@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REPUESTOS EL SARCO — Control de inventario</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Barlow+Condensed:wght@400;500;600;700&display=swap');
+
+:root{
+  --acero:#E6E9EC;
+  --acero-osc:#CFD6DB;
+  --panel:#FFFFFF;
+  --tinta:#152833;
+  --tinta-suave:#5A6B75;
+  --ambar:#F2B705;
+  --rojo:#C62A22;
+  --verde:#2F7D5B;
+  --linea:#D3DADF;
+  --sombra:0 1px 0 rgba(21,40,51,.06);
+  --r:3px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--acero);
+  color:var(--tinta);
+  font-family:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:14px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.cond{font-family:'Barlow Condensed','Archivo Narrow',system-ui,sans-serif;font-weight:600;letter-spacing:.01em}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid var(--tinta);outline-offset:2px}
+
+/* ============ LOGIN ============ */
+#login{
+  min-height:100vh;display:grid;place-items:center;padding:24px;
+  background:
+    linear-gradient(180deg,rgba(21,40,51,.04),rgba(21,40,51,.10)),
+    repeating-linear-gradient(135deg,transparent 0 22px,rgba(21,40,51,.035) 22px 24px),
+    var(--acero);
+}
+.tarjeta{
+  width:100%;max-width:370px;background:var(--panel);
+  border:1px solid var(--linea);border-top:5px solid var(--ambar);
+  padding:34px 30px 30px;position:relative;
+  box-shadow:0 18px 40px -26px rgba(21,40,51,.55);
+  animation:entra .55s cubic-bezier(.2,.8,.25,1) both;
+}
+.tarjeta::before{ /* perforación de etiqueta de repuesto */
+  content:"";position:absolute;top:16px;right:22px;width:15px;height:15px;
+  border-radius:50%;border:2px solid var(--acero-osc);background:var(--acero);
+}
+@keyframes entra{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+.marca{display:flex;align-items:baseline;gap:9px;margin-bottom:2px}
+.marca .rueda{
+  width:20px;height:20px;border-radius:50%;border:3px solid var(--tinta);
+  border-top-color:var(--ambar);align-self:center;
+  animation:gira 2.6s linear infinite;
+}
+@keyframes gira{to{transform:rotate(360deg)}}
+.marca h1{font-size:27px;margin:0;line-height:1}
+#login .sub{color:var(--tinta-suave);font-size:12.5px;margin:0 0 24px}
+.campo{margin-bottom:14px}
+.campo label{display:block;font-size:12px;color:var(--tinta-suave);margin-bottom:5px}
+.campo input,.campo select,.campo textarea{
+  width:100%;padding:9px 11px;background:#FBFCFC;
+  border:1px solid var(--linea);border-radius:var(--r);
+  transition:border-color .16s,background .16s;
+}
+.campo input:focus,.campo select:focus,.campo textarea:focus{border-color:var(--tinta);background:#fff;outline:none}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 16px;border-radius:var(--r);font-weight:600;font-size:13.5px;
+  background:var(--tinta);color:#fff;transition:transform .12s,filter .16s;
+}
+.btn:hover{filter:brightness(1.18)}
+.btn:active{transform:translateY(1px)}
+.btn.ancho{width:100%;padding:11px}
+.btn.claro{background:var(--panel);color:var(--tinta);border:1px solid var(--linea)}
+.btn.claro:hover{background:#F4F6F7;filter:none}
+.btn.peligro{background:var(--rojo)}
+.btn.ambar{background:var(--ambar);color:var(--tinta)}
+#errorLogin{color:var(--rojo);font-size:12.5px;min-height:18px;margin:10px 0 0}
+.sacude{animation:sacude .42s}
+@keyframes sacude{
+  0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}
+  40%{transform:translateX(7px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}
+}
+
+/* ============ ESTRUCTURA APP ============ */
+#app{display:none;min-height:100vh;grid-template-columns:212px 1fr;grid-template-rows:auto 1fr}
+#app.visible{display:grid;animation:aparece .4s ease both}
+@keyframes aparece{from{opacity:0}to{opacity:1}}
+
+header{
+  grid-column:1/-1;display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:11px 20px;background:var(--tinta);color:#fff;
+}
+header .marca h1{color:#fff;font-size:21px}
+header .marca .rueda{width:16px;height:16px;border-color:#fff;border-top-color:var(--ambar)}
+.buscador{flex:1;min-width:190px;max-width:440px;position:relative}
+.buscador input{
+  width:100%;padding:8px 11px 8px 32px;border-radius:var(--r);
+  border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.1);color:#fff;
+  transition:background .16s,border-color .16s;
+}
+.buscador input::placeholder{color:rgba(255,255,255,.55)}
+.buscador input:focus{background:rgba(255,255,255,.18);border-color:var(--ambar);outline:none}
+.buscador svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.6}
+.usuario{display:flex;align-items:center;gap:10px;font-size:13px}
+.avatar{
+  width:29px;height:29px;border-radius:50%;background:var(--ambar);color:var(--tinta);
+  display:grid;place-items:center;font-weight:700;font-family:'Barlow Condensed',sans-serif;font-size:16px;
+}
+.salir{color:rgba(255,255,255,.7);font-size:12.5px;text-decoration:underline;text-underline-offset:3px}
+.salir:hover{color:#fff}
+
+nav{
+  background:var(--panel);border-right:1px solid var(--linea);
+  padding:14px 0 40px;overflow-y:auto;max-height:calc(100vh - 53px);position:sticky;top:0;
+}
+.nav-tit{font-size:11.5px;color:var(--tinta-suave);padding:0 16px 7px}
+nav button{
+  display:flex;width:100%;align-items:center;justify-content:space-between;gap:8px;
+  padding:7px 16px;text-align:left;font-size:13px;color:var(--tinta);
+  border-left:3px solid transparent;transition:background .14s,border-color .14s;
+}
+nav button:hover{background:#F2F5F6}
+nav button.activo{background:#F2F5F6;border-left-color:var(--ambar);font-weight:600}
+nav button .n{font-family:'Barlow Condensed',sans-serif;font-size:13px;color:var(--tinta-suave);font-variant-numeric:tabular-nums}
+.nav-sep{height:1px;background:var(--linea);margin:12px 16px}
+
+main{padding:20px;overflow-x:hidden}
+
+/* ============ TABLERO ============ */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:1px;background:var(--linea);border:1px solid var(--linea);margin-bottom:18px}
+.kpi{background:var(--panel);padding:13px 15px}
+.kpi .et{font-size:11.5px;color:var(--tinta-suave)}
+.kpi .v{font-family:'Barlow Condensed',sans-serif;font-size:31px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums}
+.kpi.alerta .v{color:var(--ambar)}
+.kpi.critico .v{color:var(--rojo)}
+.kpi.dinero .v{font-size:25px}
+
+.barra-herr{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-bottom:12px}
+.barra-herr .sep{flex:1}
+select.filtro{padding:7px 10px;border:1px solid var(--linea);background:var(--panel);border-radius:var(--r)}
+.chip{
+  padding:6px 11px;border:1px solid var(--linea);background:var(--panel);
+  border-radius:var(--r);font-size:12.5px;transition:background .14s,border-color .14s;
+}
+.chip[aria-pressed="true"]{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+.contexto{font-size:12.5px;color:var(--tinta-suave);margin-bottom:9px}
+.contexto b{color:var(--tinta);font-variant-numeric:tabular-nums}
+
+/* ============ TABLA ============ */
+.envoltura{background:var(--panel);border:1px solid var(--linea);overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:800px}
+thead th{
+  position:sticky;top:0;z-index:2;background:#F2F5F6;text-align:left;
+  font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:600;
+  padding:9px 12px;border-bottom:1px solid var(--linea);white-space:nowrap;
+}
+thead th.orden{cursor:pointer;user-select:none}
+thead th.orden:hover{color:var(--rojo)}
+thead th .flecha{opacity:.45;font-size:10px}
+tbody tr{border-bottom:1px solid #EDF1F2}
+tbody tr.fila:hover{background:#FAFBFB}
+tbody td{padding:9px 12px;vertical-align:middle}
+.sku{font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:.04em;color:var(--tinta-suave);white-space:nowrap}
+.nombre{font-weight:500}
+.meta{font-size:11.5px;color:var(--tinta-suave)}
+.num{font-family:'Barlow Condensed',sans-serif;font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ubic{font-family:'Barlow Condensed',sans-serif;font-size:14px;background:#F2F5F6;padding:2px 7px;border:1px solid var(--linea);white-space:nowrap}
+
+.stock{display:flex;align-items:center;gap:9px;min-width:126px}
+.stock .cant{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;min-width:30px;text-align:right}
+.riel{flex:1;height:6px;background:#E9EDEF;border-radius:99px;overflow:hidden}
+.relleno{height:100%;width:0;border-radius:99px;transition:width .6s cubic-bezier(.2,.8,.25,1),background .3s}
+.ok .relleno{background:var(--verde)} .ok .cant{color:var(--verde)}
+.bajo .relleno{background:var(--ambar)} .bajo .cant{color:#9a7400}
+.cero .relleno{background:var(--rojo)} .cero .cant{color:var(--rojo)}
+
+.acciones{display:flex;gap:5px;justify-content:flex-end}
+.mini{
+  width:27px;height:27px;border:1px solid var(--linea);background:var(--panel);
+  border-radius:var(--r);display:grid;place-items:center;
+  font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:700;line-height:1;
+  transition:background .14s,transform .1s,border-color .14s;
+}
+.mini:hover{background:#F2F5F6;border-color:var(--tinta)}
+.mini:active{transform:scale(.9)}
+.mini.sumar:hover{background:#E7F2ED;border-color:var(--verde);color:var(--verde)}
+.mini.restar:hover{background:#FBEBEA;border-color:var(--rojo);color:var(--rojo)}
+.mini[disabled]{opacity:.35;cursor:not-allowed}
+
+tr.detalle td{background:#F7F9FA;padding:0;border-bottom:1px solid var(--linea)}
+.detalle-caja{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:14px 22px;
+  padding:14px 16px;animation:despliega .3s ease both;
+}
+@keyframes despliega{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+.dato .et{font-size:11px;color:var(--tinta-suave)}
+.dato .vv{font-size:13.5px;font-weight:500}
+
+tr.entrando{animation:sube .32s cubic-bezier(.2,.8,.25,1) both;animation-delay:calc(var(--i) * 22ms)}
+@keyframes sube{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+tr.destello{animation:destello 1.1s ease}
+@keyframes destello{0%{background:#FDF3D0}100%{background:transparent}}
+tr.saliendo{animation:sale .3s ease forwards}
+@keyframes sale{to{opacity:0;transform:translateX(-22px)}}
+
+.vacio{padding:52px 20px;text-align:center;color:var(--tinta-suave)}
+.vacio h3{font-size:21px;margin:0 0 6px;color:var(--tinta)}
+.vacio p{margin:0 0 16px;font-size:13px}
+
+/* ============ MODAL ============ */
+.fondo{
+  position:fixed;inset:0;background:rgba(21,40,51,.5);backdrop-filter:blur(2px);
+  display:none;place-items:center;padding:20px;z-index:50;overflow-y:auto;
+}
+.fondo.abierto{display:grid;animation:aparece .2s ease both}
+.modal{
+  background:var(--panel);width:100%;max-width:640px;border-top:5px solid var(--ambar);
+  padding:22px 24px 24px;animation:modalEntra .3s cubic-bezier(.2,.8,.25,1) both;
+  max-height:92vh;overflow-y:auto;
+}
+@keyframes modalEntra{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.modal h2{margin:0 0 3px;font-size:23px}
+.modal .sub{color:var(--tinta-suave);font-size:12.5px;margin:0 0 18px}
+.rejilla{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.rejilla .full{grid-column:1/-1}
+.pie{display:flex;gap:9px;justify-content:flex-end;margin-top:18px;padding-top:16px;border-top:1px solid var(--linea)}
+.aviso{color:var(--rojo);font-size:12px;margin-top:4px;display:none}
+.campo.mal input,.campo.mal select{border-color:var(--rojo);background:#FDF5F4}
+.campo.mal .aviso{display:block}
+
+/* ============ AVISOS FLOTANTES ============ */
+#avisos{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:9px;z-index:80}
+.aviso-f{
+  background:var(--tinta);color:#fff;padding:11px 15px;border-radius:var(--r);
+  font-size:13px;box-shadow:0 12px 28px -14px rgba(21,40,51,.7);
+  border-left:4px solid var(--verde);animation:avisoEntra .3s cubic-bezier(.2,.8,.25,1) both;max-width:320px;
+}
+.aviso-f.sale{animation:avisoSale .28s ease forwards}
+.aviso-f.alerta{border-left-color:var(--ambar)}
+.aviso-f.error{border-left-color:var(--rojo)}
+@keyframes avisoEntra{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
+@keyframes avisoSale{to{opacity:0;transform:translateX(26px)}}
+
+/* ============ MOVIMIENTOS ============ */
+.tag{font-family:'Barlow Condensed',sans-serif;font-size:13px;padding:1px 8px;border-radius:99px;font-weight:600}
+.tag.ent{background:#E7F2ED;color:var(--verde)}
+.tag.sal{background:#FBEBEA;color:var(--rojo)}
+.tag.aju{background:#FDF3D0;color:#8a6800}
+.oculto{display:none!important}
+
+/* ============ ESCENA DEL TÉCNICO (portal de acceso) ============ */
+.escena{
+  margin:-10px -10px 16px;background:#F2F5F6;border:1px solid var(--linea);
+  border-radius:var(--r);overflow:hidden;
+}
+.escena svg{display:block;width:100%;height:auto}
+.tec{animation:caminar 7s cubic-bezier(.4,0,.5,1) infinite}
+@keyframes caminar{
+  0%{transform:translateX(-78px);opacity:1}
+  34%{transform:translateX(0);opacity:1}
+  76%{transform:translateX(0);opacity:1}
+  90%{transform:translateX(66px);opacity:1}
+  97%,100%{transform:translateX(86px);opacity:0}
+}
+.pierna{transform-box:fill-box;transform-origin:50% 0}
+.pierna-a{animation:pasoA 7s linear infinite}
+.pierna-b{animation:pasoB 7s linear infinite}
+@keyframes pasoA{
+  0%{transform:rotate(19deg)}6%{transform:rotate(-19deg)}12%{transform:rotate(19deg)}
+  18%{transform:rotate(-19deg)}24%{transform:rotate(19deg)}30%{transform:rotate(-19deg)}
+  34%,78%{transform:rotate(0)}84%{transform:rotate(-17deg)}90%{transform:rotate(17deg)}
+  96%,100%{transform:rotate(0)}
+}
+@keyframes pasoB{
+  0%{transform:rotate(-19deg)}6%{transform:rotate(19deg)}12%{transform:rotate(-19deg)}
+  18%{transform:rotate(19deg)}24%{transform:rotate(-19deg)}30%{transform:rotate(19deg)}
+  34%,78%{transform:rotate(0)}84%{transform:rotate(17deg)}90%{transform:rotate(-17deg)}
+  96%,100%{transform:rotate(0)}
+}
+.brazo{transform-box:fill-box;transform-origin:50% 8%;animation:teclear 7s ease-in-out infinite}
+@keyframes teclear{
+  0%,34%{transform:rotate(6deg)}
+  41%{transform:rotate(-64deg)}45%{transform:rotate(-54deg)}
+  49%{transform:rotate(-64deg)}53%{transform:rotate(-54deg)}
+  58%{transform:rotate(-64deg)}
+  68%,100%{transform:rotate(6deg)}
+}
+.led{animation:led 7s step-end infinite}
+@keyframes led{0%,57%{fill:var(--rojo)}60%,100%{fill:var(--verde)}}
+.persiana{transform-box:fill-box;transform-origin:50% 0;animation:sube-persiana 7s ease-in-out infinite}
+@keyframes sube-persiana{
+  0%,60%{transform:scaleY(1)}
+  72%,94%{transform:scaleY(.06)}
+  100%{transform:scaleY(1)}
+}
+.rotulo{animation:parpadeo 7s ease-in-out infinite}
+@keyframes parpadeo{0%,57%{opacity:.35}62%{opacity:1}68%{opacity:.6}74%,100%{opacity:1}}
+.chispa{animation:chispa 7s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 50%}
+@keyframes chispa{0%,59%{opacity:0;transform:scale(.4)}64%{opacity:1;transform:scale(1.3)}72%,100%{opacity:0;transform:scale(1.6)}}
+
+/* ============ RELOJ ============ */
+.reloj{text-align:right;line-height:1.15;min-width:104px}
+.reloj .h{
+  font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:.02em;
+}
+.reloj .h .seg{color:var(--ambar)}
+.reloj .f{font-size:11px;color:rgba(255,255,255,.62)}
+
+/* ============ IMPRESIÓN / PDF ============ */
+#impresion{display:none}
+.doc-enc{border-bottom:3px solid #152833;padding-bottom:10px;margin-bottom:16px}
+.doc-enc h1{margin:0;font-size:26px;letter-spacing:.04em}
+.doc-enc .meta{font-size:12px;color:#5A6B75;margin-top:3px}
+.doc-res{display:flex;gap:26px;margin-bottom:16px;font-size:12px}
+.doc-res b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:22px}
+#impresion table{width:100%;min-width:0;border-collapse:collapse;font-size:11.5px}
+#impresion th{background:#EDF1F2;text-align:left;padding:6px 8px;border-bottom:1px solid #999}
+#impresion td{padding:5px 8px;border-bottom:1px solid #E2E7EA}
+.doc-pie{margin-top:18px;font-size:11px;color:#5A6B75;border-top:1px solid #D3DADF;padding-top:8px}
+@media print{
+  @page{margin:14mm}
+  body.imprimiendo{background:#fff}
+  body.imprimiendo > *{display:none !important}
+  body.imprimiendo #impresion{display:block !important}
+  #impresion tr{page-break-inside:avoid}
+  #impresion thead{display:table-header-group}
+}
+
+@media (max-width:900px){
+  #app.visible{grid-template-columns:1fr}
+  nav{position:static;max-height:none;border-right:0;border-bottom:1px solid var(--linea);display:flex;flex-wrap:wrap;gap:4px;padding:10px}
+  .nav-tit,.nav-sep{display:none}
+  nav button{width:auto;border-left:0;border:1px solid var(--linea);border-radius:var(--r);padding:5px 10px}
+  nav button.activo{border-color:var(--tinta)}
+  .rejilla{grid-template-columns:1fr}
+  main{padding:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<section id="login">
+  <div class="tarjeta" id="tarjetaLogin">
+    <div class="escena">
+      <svg viewBox="0 0 320 150" role="img" aria-label="Ilustración: un técnico marca su clave en el panel y entra al almacén">
+        <!-- piso y pared -->
+        <rect x="0" y="0" width="320" height="150" fill="#F2F5F6"/>
+        <rect x="0" y="126" width="320" height="24" fill="#E1E7EA"/>
+        <path d="M0 126 H320" stroke="#C3CDD3" stroke-width="2"/>
+        <g opacity=".5" stroke="#C3CDD3" stroke-width="2">
+          <path d="M40 126 V150"/><path d="M110 126 V150"/><path d="M180 126 V150"/><path d="M250 126 V150"/>
+        </g>
+
+        <!-- portón del almacén -->
+        <rect x="196" y="24" width="104" height="102" fill="#152833"/>
+        <g class="persiana">
+          <rect x="200" y="28" width="96" height="94" fill="#9FAEB6"/>
+          <g stroke="#7C8D97" stroke-width="2">
+            <path d="M200 40 H296"/><path d="M200 52 H296"/><path d="M200 64 H296"/>
+            <path d="M200 76 H296"/><path d="M200 88 H296"/><path d="M200 100 H296"/><path d="M200 112 H296"/>
+          </g>
+        </g>
+        <!-- rótulo sobre el portón -->
+        <rect class="rotulo" x="196" y="10" width="104" height="12" fill="#F2B705"/>
+        <text class="rotulo" x="248" y="19.5" text-anchor="middle" font-family="Barlow Condensed, sans-serif"
+              font-size="10" font-weight="700" fill="#152833" letter-spacing="1.2">ALMACEN</text>
+
+        <!-- panel de acceso -->
+        <rect x="168" y="56" width="22" height="34" rx="3" fill="#152833"/>
+        <circle class="led" cx="179" cy="63" r="3" fill="#C62A22"/>
+        <g fill="#5A6B75">
+          <rect x="172" y="70" width="5" height="4" rx="1"/><rect x="181" y="70" width="5" height="4" rx="1"/>
+          <rect x="172" y="77" width="5" height="4" rx="1"/><rect x="181" y="77" width="5" height="4" rx="1"/>
+          <rect x="172" y="84" width="5" height="4" rx="1"/><rect x="181" y="84" width="5" height="4" rx="1"/>
+        </g>
+        <g class="chispa" stroke="#F2B705" stroke-width="2" stroke-linecap="round">
+          <path d="M160 48 L154 42"/><path d="M166 44 L164 36"/><path d="M154 56 L146 54"/>
+        </g>
+
+        <!-- técnico -->
+        <g class="tec" transform="translate(96,0)">
+          <!-- piernas -->
+          <g class="pierna pierna-a"><rect x="-11" y="98" width="9" height="28" rx="3" fill="#2F3E49"/>
+            <rect x="-14" y="120" width="14" height="7" rx="2.5" fill="#152833"/></g>
+          <g class="pierna pierna-b"><rect x="2" y="98" width="9" height="28" rx="3" fill="#3C4C58"/>
+            <rect x="0" y="120" width="14" height="7" rx="2.5" fill="#152833"/></g>
+          <!-- overol -->
+          <rect x="-15" y="60" width="30" height="42" rx="7" fill="#F2B705"/>
+          <rect x="-15" y="60" width="30" height="9" rx="4" fill="#DCA704"/>
+          <rect x="-4" y="78" width="9" height="11" rx="2" fill="#E0AC10"/>
+          <!-- brazo que marca la clave -->
+          <g class="brazo">
+            <rect x="9" y="64" width="8" height="30" rx="4" fill="#F2B705"/>
+            <circle cx="13" cy="96" r="5" fill="#C98E5E"/>
+          </g>
+          <!-- brazo posterior con llave inglesa -->
+          <rect x="-18" y="64" width="8" height="28" rx="4" fill="#DCA704"/>
+          <g transform="translate(-14,96) rotate(20)">
+            <rect x="-2" y="-2" width="4" height="18" rx="1.5" fill="#8A99A2"/>
+            <path d="M-4.5 -2 h9 v-5 h-3 v2 h-3 v-2 h-3 z" fill="#8A99A2"/>
+          </g>
+          <!-- cabeza -->
+          <circle cx="0" cy="46" r="13" fill="#C98E5E"/>
+          <path d="M-13 44 a13 13 0 0 1 26 0 z" fill="#152833"/>
+          <path d="M-14 44 h20 a3 3 0 0 1 0 6 h-20 z" fill="#152833"/>
+          <circle cx="5" cy="47" r="1.6" fill="#152833"/>
+          <path d="M-15 59 h30 l-6 5 h-18 z" fill="#FFFFFF" opacity=".9"/>
+        </g>
+      </svg>
+    </div>
+    <div class="marca"><span class="rueda"></span><h1>REPUESTOS EL SARCO</h1></div>
+    <p class="sub">Control de inventario · almacén y mostrador</p>
+    <div class="campo">
+      <label for="usuario">Usuario</label>
+      <input id="usuario" type="text" autocomplete="username" placeholder="pablo">
+    </div>
+    <div class="campo">
+      <label for="clave">Contraseña</label>
+      <input id="clave" type="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <p id="errorLogin" role="alert"></p>
+    <button class="btn ancho" id="btnEntrar">Entrar al almacén</button>
+  </div>
+</section>
+
+<!-- ===================== APP ===================== -->
+<div id="app">
+  <header>
+    <div class="marca"><span class="rueda"></span><h1>REPUESTOS EL SARCO</h1></div>
+    <div class="reloj">
+      <div class="h" id="relojHora">--:--<span class="seg">:--</span></div>
+      <div class="f" id="relojFecha">—</div>
+    </div>
+    <div class="buscador">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="buscar" type="search" placeholder="Buscar por nombre, código, marca o modelo de moto…">
+    </div>
+    <div class="usuario">
+      <span class="avatar">P</span>
+      <div>
+        <div style="font-weight:600">Pablo</div>
+        <button class="salir" id="btnSalir">Cerrar sesión</button>
+      </div>
+    </div>
+  </header>
+
+  <nav>
+    <div class="nav-tit">Vistas</div>
+    <button data-vista="inventario" class="activo">Inventario</button>
+    <button data-vista="movimientos">Movimientos <span class="n" id="nMovs">0</span></button>
+    <div class="nav-sep"></div>
+    <div class="nav-tit">Categorías</div>
+    <div id="listaCats"></div>
+  </nav>
+
+  <main>
+    <!-- Vista inventario -->
+    <div id="vistaInventario">
+      <div class="kpis">
+        <div class="kpi"><div class="et">Repuestos distintos</div><div class="v" id="kSkus">0</div></div>
+        <div class="kpi"><div class="et">Unidades en stock</div><div class="v" id="kUnidades">0</div></div>
+        <div class="kpi dinero"><div class="et">Valor de venta</div><div class="v" id="kValor">S/ 0</div></div>
+        <div class="kpi alerta"><div class="et">Bajo el mínimo</div><div class="v" id="kBajo">0</div></div>
+        <div class="kpi critico"><div class="et">Agotados</div><div class="v" id="kCero">0</div></div>
+      </div>
+
+      <div class="barra-herr">
+        <button class="btn ambar" id="btnNuevo">+ Nuevo repuesto</button>
+        <button class="chip" data-estado="todos" aria-pressed="true">Todos</button>
+        <button class="chip" data-estado="ok" aria-pressed="false">Stock sano</button>
+        <button class="chip" data-estado="bajo" aria-pressed="false">Bajo mínimo</button>
+        <button class="chip" data-estado="cero" aria-pressed="false">Agotados</button>
+        <select class="filtro" id="marcaFiltro"><option value="">Todas las marcas</option></select>
+        <span class="sep"></span>
+        <button class="btn claro" id="btnExportar">Descargar respaldo</button>
+        <button class="btn claro" id="btnImportar">Cargar respaldo</button>
+        <input type="file" id="archivo" accept="application/json" class="oculto">
+      </div>
+
+      <p class="contexto" id="contexto"></p>
+
+      <div class="envoltura">
+        <table>
+          <thead>
+            <tr>
+              <th class="orden" data-campo="sku">Código <span class="flecha"></span></th>
+              <th class="orden" data-campo="nombre">Repuesto <span class="flecha"></span></th>
+              <th class="orden" data-campo="categoria">Categoría <span class="flecha"></span></th>
+              <th>Ubicación</th>
+              <th class="orden" data-campo="precioVenta" style="text-align:right">Venta <span class="flecha"></span></th>
+              <th class="orden" data-campo="stock">Stock real <span class="flecha"></span></th>
+              <th style="text-align:right">Mover</th>
+            </tr>
+          </thead>
+          <tbody id="cuerpo"></tbody>
+        </table>
+      </div>
+      <div id="sinResultados" class="oculto"></div>
+      <div style="display:flex;justify-content:center;margin-top:14px">
+        <button class="btn claro" id="btnMas">Ver más repuestos</button>
+      </div>
+    </div>
+
+    <!-- Vista movimientos -->
+    <div id="vistaMovimientos" class="oculto">
+      <div class="kpis">
+        <div class="kpi"><div class="et">Movimientos registrados</div><div class="v" id="mTotal">0</div></div>
+        <div class="kpi"><div class="et">Unidades ingresadas</div><div class="v" id="mEnt">0</div></div>
+        <div class="kpi critico"><div class="et">Unidades vendidas o salidas</div><div class="v" id="mSal">0</div></div>
+      </div>
+      <div class="envoltura">
+        <table>
+          <thead><tr>
+            <th>Hora</th><th>Tipo</th><th>Repuesto</th><th>Cantidad</th><th>Stock resultante</th><th>Nota</th>
+          </tr></thead>
+          <tbody id="cuerpoMovs"></tbody>
+        </table>
+      </div>
+      <div id="sinMovs" class="vacio oculto" style="background:var(--panel);border:1px solid var(--linea);border-top:0">
+        <h3>Todavía no hay movimientos en esta sesión</h3>
+        <p>Cada ingreso, venta o ajuste que hagas en el inventario queda registrado aquí con hora y stock resultante.</p>
+      </div>
+      <div class="barra-herr" style="margin:14px 0 0;justify-content:flex-end">
+        <span class="contexto" style="margin:0;flex:1" id="pieMovs"></span>
+        <button class="btn ambar" id="btnPdfMovs">Exportar movimientos a PDF</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===================== MODAL REPUESTO ===================== -->
+<div class="fondo" id="modalItem">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tituloModal">
+    <h2 id="tituloModal">Nuevo repuesto</h2>
+    <p class="sub">Los campos con datos obligatorios se marcan en rojo si falta algo.</p>
+    <div class="rejilla">
+      <div class="campo full">
+        <label for="fNombre">Nombre del repuesto</label>
+        <input id="fNombre" placeholder="Ej. Kit de arrastre reforzado">
+        <span class="aviso">Escribe el nombre del repuesto.</span>
+      </div>
+      <div class="campo">
+        <label for="fCategoria">Categoría</label>
+        <select id="fCategoria"></select>
+      </div>
+      <div class="campo">
+        <label for="fMarca">Marca</label>
+        <input id="fMarca" placeholder="Ej. DID, NGK, Bosch">
+        <span class="aviso">Indica la marca.</span>
+      </div>
+      <div class="campo">
+        <label for="fModelo">Moto compatible</label>
+        <input id="fModelo" placeholder="Ej. Honda CGL 125">
+      </div>
+      <div class="campo">
+        <label for="fUbicacion">Ubicación en almacén</label>
+        <input id="fUbicacion" placeholder="Ej. B-14">
+      </div>
+      <div class="campo">
+        <label for="fStock">Stock actual (unidades)</label>
+        <input id="fStock" type="number" min="0" step="1" value="0">
+        <span class="aviso">Usa un número igual o mayor que cero.</span>
+      </div>
+      <div class="campo">
+        <label for="fMinimo">Stock mínimo antes de alertar</label>
+        <input id="fMinimo" type="number" min="0" step="1" value="5">
+        <span class="aviso">Usa un número igual o mayor que cero.</span>
+      </div>
+      <div class="campo">
+        <label for="fCosto">Precio de compra (S/)</label>
+        <input id="fCosto" type="number" min="0" step="0.5" value="0">
+        <span class="aviso">Usa un número igual o mayor que cero.</span>
+      </div>
+      <div class="campo">
+        <label for="fVenta">Precio de venta (S/)</label>
+        <input id="fVenta" type="number" min="0" step="0.5" value="0">
+        <span class="aviso">Usa un número igual o mayor que cero.</span>
+      </div>
+      <div class="campo full">
+        <label for="fProveedor">Proveedor</label>
+        <input id="fProveedor" placeholder="Ej. Importaciones Mesa Redonda">
+      </div>
+    </div>
+    <div class="pie">
+      <button class="btn claro" data-cerrar>Cancelar</button>
+      <button class="btn" id="btnGuardar">Guardar repuesto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL MOVIMIENTO ===================== -->
+<div class="fondo" id="modalMov">
+  <div class="modal" style="max-width:430px" role="dialog" aria-modal="true">
+    <h2>Registrar movimiento</h2>
+    <p class="sub" id="movSub"></p>
+    <div class="campo">
+      <label for="mvTipo">Tipo de movimiento</label>
+      <select id="mvTipo">
+        <option value="entrada">Entrada — compra o devolución</option>
+        <option value="salida">Salida — venta o consumo en taller</option>
+        <option value="ajuste">Ajuste — corregir tras conteo físico</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="mvCant" id="lblCant">Cantidad</label>
+      <input id="mvCant" type="number" min="0" step="1" value="1">
+      <span class="aviso">Ingresa una cantidad válida.</span>
+    </div>
+    <div class="campo">
+      <label for="mvNota">Nota (opcional)</label>
+      <input id="mvNota" placeholder="Ej. Boleta 0042, cliente mostrador">
+    </div>
+    <div class="pie">
+      <button class="btn claro" data-cerrar>Cancelar</button>
+      <button class="btn" id="btnAplicarMov">Aplicar al stock</button>
+    </div>
+  </div>
+</div>
+
+<div id="avisos" aria-live="polite"></div>
+
+<!-- Documento que se manda a la impresora o se guarda como PDF -->
+<div id="impresion"></div>
+
+<script>
+/* =========================================================
+   1. DATOS BASE
+   ========================================================= */
+const MODELOS = ["Honda CGL 125","Honda XR 150L","Honda Invicta 150","Bajaj Boxer CT 100","Bajaj Pulsar NS 160",
+  "Bajaj Pulsar 180","Yamaha YBR 125","Yamaha FZ 2.0","Yamaha XTZ 125","Suzuki GN 125","Suzuki EN 125",
+  "Italika FT 150","Ronco Cargo 150","Wanxin 200","TVS Apache RTR 160","Zongshen ZS 150","Keeway TX 200",
+  "Lifan LF 150","Hero Hunk 150","Universal"];
+
+const PROVEEDORES = ["Importaciones Mesa Redonda","Motorepuestos del Sur SAC","Distribuidora Aceros Lima",
+  "Crosland Repuestos","Andina Parts EIRL","Comercial Wanxin Perú","Repuestos Grau"];
+
+const CATEGORIAS = [
+  {id:"mot", nombre:"Motor", letra:"A", marcas:["Honda Genuine","Wanxin","Zongshen","Italika","Rikeng"], partes:[
+    ["Pistón estándar",58],["Pistón sobremedida 0.50",66],["Juego de anillos",34],["Juego de empaquetaduras",42],
+    ["Empaquetadura de culata",26],["Cilindro completo",185],["Válvula de admisión",28],["Válvula de escape",30],
+    ["Resorte de válvula",14],["Biela con muñón",95],["Cigüeñal completo",290],["Árbol de levas",130],
+    ["Cadenilla de distribución",38],["Tensor de cadenilla",45],["Bomba de aceite",78],["Tapa de culata",64],
+    ["Retén de cigüeñal",12],["Kit de reparación de motor",340]]},
+  {id:"fre", nombre:"Frenos", letra:"B", marcas:["Brembo","Ferodo","Nissin","Galfer","Duraparts"], partes:[
+    ["Pastillas de freno delantero",38],["Pastillas de freno trasero",35],["Zapatas de freno",28],
+    ["Disco de freno delantero",130],["Disco de freno trasero",120],["Bomba de freno delantera",165],
+    ["Cable de freno delantero",16],["Manija de freno",22],["Líquido de freno DOT 4 500ml",24],
+    ["Pistón de cáliper",48],["Kit de reparación de bomba",36],["Cáliper completo",245]]},
+  {id:"sus", nombre:"Suspensión y dirección", letra:"C", marcas:["YSS","Showa","Gabriel","Duraparts","Wanxin"], partes:[
+    ["Amortiguador trasero par",210],["Barra de suspensión delantera",120],["Retén de barra",18],
+    ["Resorte de suspensión",55],["Guardapolvo de barra",11],["Kit de rodamientos de dirección",48],
+    ["Tijera trasera",190],["Bocinas de tijera",22],["Tijera delantera (aro)",165],["Aceite de suspensión 500ml",26]]},
+  {id:"ele", nombre:"Sistema eléctrico", letra:"D", marcas:["NGK","Bosch","Yuasa","Denso","Motobatt"], partes:[
+    ["Bujía estándar",12],["Bujía iridium",38],["Capuchón de bujía",14],["CDI electrónico",95],
+    ["Bobina de alta",62],["Regulador rectificador",78],["Estator completo",140],["Batería 12V 5Ah",115],
+    ["Batería 12V 7Ah",145],["Arrancador eléctrico",180],["Relay de arranque",34],["Faro delantero",88],
+    ["Foco halógeno H4",18],["Direccional delantera",26],["Direccional trasera",26],["Claxon 12V",28],
+    ["Llave de luces",32],["Chicote de cables completo",135],["Sensor de neutro",24]]},
+  {id:"tra", nombre:"Transmisión", letra:"E", marcas:["DID","KMC","Renold","Duraparts","Wanxin"], partes:[
+    ["Kit de arrastre completo",145],["Cadena 428H x 118",78],["Cadena 520 x 112",110],["Piñón de salida",32],
+    ["Catalina trasera",58],["Disco de embrague juego",72],["Prensa de embrague",88],["Cable de embrague",18],
+    ["Manija de embrague",22],["Campana de embrague",130],["Guía de cadena",16],["Eje de cambios",68]]},
+  {id:"lla", nombre:"Llantas y aros", letra:"F", marcas:["Pirelli","Michelin","Kenda","Timsun","Vee Rubber"], partes:[
+    ["Llanta delantera 2.75-18",135],["Llanta trasera 90/90-18",160],["Llanta delantera 80/100-17",125],
+    ["Llanta trasera 100/90-17",175],["Llanta trasera 110/90-17",195],["Cámara 18 pulgadas",28],
+    ["Cámara 17 pulgadas",26],["Aro delantero completo",180],["Aro trasero completo",210],
+    ["Juego de rayos",45],["Válvula de aire",6]]},
+  {id:"car", nombre:"Carrocería y chasis", letra:"G", marcas:["Italika","Wanxin","Zongshen","Genérico","Keeway"], partes:[
+    ["Tanque de combustible",245],["Tapa de tanque",34],["Guardabarros delantero",68],["Guardabarros trasero",72],
+    ["Carenado lateral par",120],["Asiento completo",145],["Espejo retrovisor par",42],["Parrilla trasera",95],
+    ["Pata lateral",38],["Posapiés delantero par",34],["Tapa de cadena",44],["Manubrio",78],
+    ["Puño de acelerador",16],["Juego de puños",14]]},
+  {id:"fil", nombre:"Filtros", letra:"H", marcas:["Mann","Fram","K&N","Hiflofiltro","Duraparts"], partes:[
+    ["Filtro de aire",32],["Filtro de aire lavable",68],["Filtro de aceite",22],["Filtro de gasolina",12],
+    ["Malla de gasolina",9],["Caja de filtro de aire",78]]},
+  {id:"lub", nombre:"Lubricantes y químicos", letra:"I", marcas:["Castrol","Motul","Vistony","Repsol","Shell"], partes:[
+    ["Aceite 20W-50 mineral 1L",34],["Aceite 10W-40 semisintético 1L",46],["Aceite sintético 10W-40 1L",62],
+    ["Grasa para rodamientos 500g",22],["Limpiador de cadena 400ml",28],["Lubricante de cadena 400ml",32],
+    ["Limpiador de frenos 400ml",24],["Aditivo limpia inyectores",26],["Refrigerante 1L",28],["Silicona negra 85g",18]]},
+  {id:"acc", nombre:"Accesorios y seguridad", letra:"J", marcas:["Vertigo","LS2","Shaft","Motostar","Genérico"], partes:[
+    ["Casco abierto certificado",165],["Casco integral certificado",290],["Mica de casco",48],
+    ["Guantes de cuero",78],["Alarma con control remoto",95],["Candado de disco",68],["Cadena antirrobo 1.2m",85],
+    ["Maletero 45L",230],["Soporte de celular",38],["Cargador USB para moto",42],["Protector de manos",55]]}
+];
+
+/* =========================================================
+   2. GENERACIÓN DEL CATÁLOGO (330 repuestos)
+   ========================================================= */
+function semilla(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd = semilla(20260914);
+const ri = (a,b)=>Math.floor(rnd()*(b-a+1))+a;
+const elige = a => a[Math.floor(rnd()*a.length)];
+const redondea = n => Math.round(n*2)/2;
+
+let items = [];
+let movimientos = [];
+let contador = 0;
+
+(function generar(){
+  CATEGORIAS.forEach((cat,ci)=>{
+    let mi = ci*3;
+    cat.partes.forEach((parte,pi)=>{
+      for(let k=0;k<3;k++){
+        const modelo = MODELOS[(mi++)%MODELOS.length];
+        const costo = redondea(parte[1]*(0.82+rnd()*0.3));
+        const margen = 1.35+rnd()*0.4;
+        const minimo = ri(3,10);
+        let stock;
+        const dado = rnd();
+        if(dado<0.07) stock = 0;
+        else if(dado<0.22) stock = ri(1,minimo);
+        else stock = ri(minimo+1,68);
+        items.push({
+          id: ++contador,
+          sku: cat.id.toUpperCase()+"-"+String(contador).padStart(4,"0"),
+          nombre: parte[0],
+          categoria: cat.nombre,
+          catId: cat.id,
+          marca: elige(cat.marcas),
+          modelo,
+          ubicacion: cat.letra+"-"+String(pi+1).padStart(2,"0"),
+          stock,
+          minimo,
+          costo,
+          precioVenta: redondea(costo*margen),
+          proveedor: elige(PROVEEDORES)
+        });
+      }
+    });
+  });
+})();
+
+/* =========================================================
+   3. ESTADO DE LA INTERFAZ
+   ========================================================= */
+const estado = {cat:"", texto:"", estadoStock:"todos", marca:"", campo:"categoria", asc:true, limite:40, abierta:null, vista:"inventario"};
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const soles = n => "S/ "+n.toLocaleString("es-PE",{minimumFractionDigits:2,maximumFractionDigits:2});
+const nivel = it => it.stock===0 ? "cero" : it.stock<=it.minimo ? "bajo" : "ok";
+
+/* =========================================================
+   4. LOGIN
+   ========================================================= */
+const USUARIO="pablo", CLAVE="pablo123";
+function entrar(){
+  const u=$("#usuario").value.trim().toLowerCase(), c=$("#clave").value;
+  if(u===USUARIO && c===CLAVE){
+    $("#login").style.display="none";
+    $("#app").classList.add("visible");
+    iniciar();
+  }else{
+    $("#errorLogin").textContent = "Usuario o contraseña incorrectos. Verifica y vuelve a intentar.";
+    const t=$("#tarjetaLogin"); t.classList.remove("sacude"); void t.offsetWidth; t.classList.add("sacude");
+    $("#clave").value=""; $("#clave").focus();
+  }
+}
+$("#btnEntrar").addEventListener("click",entrar);
+["usuario","clave"].forEach(id=>$("#"+id).addEventListener("keydown",e=>{if(e.key==="Enter")entrar()}));
+$("#btnSalir").addEventListener("click",()=>{
+  $("#app").classList.remove("visible");
+  $("#login").style.display="grid";
+  $("#usuario").value=""; $("#clave").value=""; $("#errorLogin").textContent="";
+});
+
+/* =========================================================
+   5. AVISOS FLOTANTES
+   ========================================================= */
+function avisar(texto,tipo=""){
+  const d=document.createElement("div");
+  d.className="aviso-f "+tipo; d.textContent=texto;
+  $("#avisos").appendChild(d);
+  setTimeout(()=>{d.classList.add("sale");setTimeout(()=>d.remove(),280)},3000);
+}
+
+/* =========================================================
+   6. CONTADORES ANIMADOS
+   ========================================================= */
+function contarHasta(el,destino,prefijo=""){
+  const inicio = parseFloat(el.dataset.valor||0);
+  if(inicio===destino){el.textContent=prefijo+fmt(destino,prefijo);return}
+  const dur=600, t0=performance.now();
+  function paso(t){
+    const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent = prefijo+fmt(inicio+(destino-inicio)*e,prefijo);
+    if(p<1) requestAnimationFrame(paso); else el.dataset.valor=destino;
+  }
+  requestAnimationFrame(paso);
+}
+function fmt(v,prefijo){
+  return prefijo ? Math.round(v).toLocaleString("es-PE") : Math.round(v).toLocaleString("es-PE");
+}
+
+/* =========================================================
+   7. FILTRADO Y ORDEN
+   ========================================================= */
+function filtrados(){
+  const t = estado.texto.toLowerCase();
+  let r = items.filter(it=>{
+    if(estado.cat && it.catId!==estado.cat) return false;
+    if(estado.marca && it.marca!==estado.marca) return false;
+    if(estado.estadoStock!=="todos" && nivel(it)!==estado.estadoStock) return false;
+    if(t && !(it.nombre+" "+it.sku+" "+it.marca+" "+it.modelo+" "+it.categoria+" "+it.ubicacion).toLowerCase().includes(t)) return false;
+    return true;
+  });
+  const c = estado.campo;
+  r.sort((a,b)=>{
+    let x=a[c],y=b[c];
+    if(c==="categoria"){ // dentro de categoría, ordena por nombre
+      if(x===y) return a.nombre.localeCompare(b.nombre,"es");
+    }
+    if(typeof x==="string") return estado.asc ? x.localeCompare(y,"es") : y.localeCompare(x,"es");
+    return estado.asc ? x-y : y-x;
+  });
+  return r;
+}
+
+/* =========================================================
+   8. PINTAR TABLA
+   ========================================================= */
+function pintar(animar=true){
+  const lista = filtrados();
+  const vista = lista.slice(0,estado.limite);
+  const cuerpo = $("#cuerpo");
+  cuerpo.innerHTML = "";
+
+  vista.forEach((it,i)=>{
+    const tr = document.createElement("tr");
+    tr.className = "fila"+(animar&&i<25?" entrando":"");
+    tr.style.setProperty("--i",i);
+    tr.dataset.id = it.id;
+    const nv = nivel(it);
+    const pct = Math.min(100, it.stock===0?0:Math.max(6,(it.stock/Math.max(it.minimo*4,12))*100));
+    tr.innerHTML = `
+      <td class="sku">${it.sku}</td>
+      <td><div class="nombre">${esc(it.nombre)}</div><div class="meta">${esc(it.marca)} · ${esc(it.modelo)}</div></td>
+      <td>${esc(it.categoria)}</td>
+      <td><span class="ubic">${esc(it.ubicacion)}</span></td>
+      <td class="num" style="text-align:right">${soles(it.precioVenta)}</td>
+      <td>
+        <div class="stock ${nv}">
+          <span class="cant">${it.stock}</span>
+          <span class="riel"><span class="relleno" style="width:0"></span></span>
+          <span class="meta" style="min-width:52px">mín ${it.minimo}</span>
+        </div>
+      </td>
+      <td>
+        <div class="acciones">
+          <button class="mini restar" data-accion="restar" title="Salida de 1 unidad" ${it.stock===0?"disabled":""}>−</button>
+          <button class="mini sumar" data-accion="sumar" title="Ingreso de 1 unidad">+</button>
+          <button class="mini" data-accion="mover" title="Registrar movimiento">⇄</button>
+          <button class="mini" data-accion="editar" title="Editar repuesto">✎</button>
+          <button class="mini" data-accion="borrar" title="Eliminar repuesto">×</button>
+        </div>
+      </td>`;
+    cuerpo.appendChild(tr);
+    requestAnimationFrame(()=>{tr.querySelector(".relleno").style.width = pct+"%"});
+
+    if(estado.abierta===it.id) cuerpo.appendChild(filaDetalle(it));
+  });
+
+  // Estado vacío
+  const sin = $("#sinResultados");
+  if(lista.length===0){
+    sin.className="vacio"; sin.style.background="var(--panel)"; sin.style.border="1px solid var(--linea)"; sin.style.borderTop="0";
+    sin.innerHTML = `<h3>No hay repuestos con estos filtros</h3>
+      <p>Prueba borrando el texto de búsqueda o eligiendo otra categoría. Si el repuesto no existe todavía, créalo.</p>
+      <button class="btn ambar" onclick="abrirNuevo()">+ Nuevo repuesto</button>`;
+    sin.classList.remove("oculto");
+  } else sin.classList.add("oculto");
+
+  $("#btnMas").style.display = lista.length>estado.limite ? "inline-flex" : "none";
+  $("#btnMas").textContent = `Ver más repuestos (${lista.length-estado.limite} restantes)`;
+  $("#contexto").innerHTML = `Mostrando <b>${Math.min(estado.limite,lista.length)}</b> de <b>${lista.length}</b> repuestos filtrados · catálogo total <b>${items.length}</b>`;
+
+  actualizarKpis(lista);
+  actualizarCategorias();
+}
+
+function filaDetalle(it){
+  const tr=document.createElement("tr");
+  tr.className="detalle";
+  const margen = it.precioVenta-it.costo;
+  const pmargen = it.costo>0 ? Math.round(margen/it.costo*100) : 0;
+  tr.innerHTML = `<td colspan="7"><div class="detalle-caja">
+    <div class="dato"><div class="et">Precio de compra</div><div class="vv">${soles(it.costo)}</div></div>
+    <div class="dato"><div class="et">Ganancia por unidad</div><div class="vv">${soles(margen)} (${pmargen}%)</div></div>
+    <div class="dato"><div class="et">Valor del stock a venta</div><div class="vv">${soles(it.stock*it.precioVenta)}</div></div>
+    <div class="dato"><div class="et">Proveedor</div><div class="vv">${esc(it.proveedor)}</div></div>
+    <div class="dato"><div class="et">Moto compatible</div><div class="vv">${esc(it.modelo)}</div></div>
+    <div class="dato"><div class="et">Estado</div><div class="vv">${it.stock===0?"Agotado, reponer ya":it.stock<=it.minimo?"Bajo el mínimo":"Stock sano"}</div></div>
+  </div></td>`;
+  return tr;
+}
+
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+/* =========================================================
+   9. KPIs Y CATEGORÍAS
+   ========================================================= */
+function actualizarKpis(lista){
+  const base = lista || items;
+  const unidades = base.reduce((s,i)=>s+i.stock,0);
+  const valor = base.reduce((s,i)=>s+i.stock*i.precioVenta,0);
+  contarHasta($("#kSkus"), base.length);
+  contarHasta($("#kUnidades"), unidades);
+  const kv=$("#kValor"); contarHasta(kv, valor, "S/ ");
+  contarHasta($("#kBajo"), base.filter(i=>nivel(i)==="bajo").length);
+  contarHasta($("#kCero"), base.filter(i=>nivel(i)==="cero").length);
+}
+
+function actualizarCategorias(){
+  $$("#listaCats button").forEach(b=>{
+    const id=b.dataset.cat;
+    const n = id ? items.filter(i=>i.catId===id).length : items.length;
+    b.querySelector(".n").textContent = n;
+    b.classList.toggle("activo", estado.cat===id);
+  });
+}
+
+(function construirNav(){
+  const cont = $("#listaCats");
+  const todas = document.createElement("button");
+  todas.dataset.cat=""; todas.className="activo";
+  todas.innerHTML = `<span>Todo el catálogo</span><span class="n">0</span>`;
+  cont.appendChild(todas);
+  CATEGORIAS.forEach(c=>{
+    const b=document.createElement("button");
+    b.dataset.cat=c.id;
+    b.innerHTML = `<span>${c.nombre}</span><span class="n">0</span>`;
+    cont.appendChild(b);
+  });
+  cont.addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b)return;
+    estado.cat=b.dataset.cat; estado.limite=40; estado.abierta=null; pintar();
+  });
+})();
+
+/* =========================================================
+   10. INTERACCIONES DE LA TABLA
+   ========================================================= */
+$("#cuerpo").addEventListener("click",e=>{
+  const btn = e.target.closest("[data-accion]");
+  const fila = e.target.closest("tr.fila");
+  if(!fila) return;
+  const it = items.find(i=>i.id==fila.dataset.id);
+  if(!it) return;
+
+  if(!btn){ // abrir o cerrar detalle
+    estado.abierta = estado.abierta===it.id ? null : it.id;
+    pintar(false);
+    return;
+  }
+  const a = btn.dataset.accion;
+  if(a==="sumar") aplicar(it,"entrada",1,"Ingreso rápido");
+  else if(a==="restar") aplicar(it,"salida",1,"Venta en mostrador");
+  else if(a==="mover") abrirMovimiento(it);
+  else if(a==="editar") abrirEditar(it);
+  else if(a==="borrar") borrar(it,fila);
+});
+
+function destacar(id){
+  const f = $(`#cuerpo tr.fila[data-id="${id}"]`);
+  if(f){f.classList.remove("destello"); void f.offsetWidth; f.classList.add("destello")}
+}
+
+function aplicar(it,tipo,cant,nota){
+  cant = Math.abs(Math.round(cant));
+  if(tipo==="salida" && cant>it.stock){
+    avisar(`Solo quedan ${it.stock} unidades de ${it.nombre}. Ajusta la cantidad.`,"error");
+    return false;
+  }
+  if(tipo==="entrada") it.stock += cant;
+  else if(tipo==="salida") it.stock -= cant;
+  else it.stock = cant;
+
+  movimientos.unshift({
+    hora:new Date(), tipo, cant, sku:it.sku, nombre:it.nombre, resultante:it.stock, nota:nota||"—"
+  });
+  pintar(false);
+  destacar(it.id);
+  pintarMovimientos();
+  const etiqueta = tipo==="entrada"?"Ingreso":tipo==="salida"?"Salida":"Ajuste";
+  avisar(`${etiqueta} registrado. ${it.nombre} queda en ${it.stock} unidades.`, nivel(it)==="cero"?"error":nivel(it)==="bajo"?"alerta":"");
+  if(nivel(it)==="cero") avisar(`${it.nombre} quedó agotado. Pídelo a ${it.proveedor}.`,"error");
+  return true;
+}
+
+function borrar(it,fila){
+  fila.classList.add("saliendo");
+  setTimeout(()=>{
+    items = items.filter(i=>i.id!==it.id);
+    if(estado.abierta===it.id) estado.abierta=null;
+    pintar(false);
+    avisar(`${it.nombre} (${it.sku}) se eliminó del catálogo.`,"alerta");
+  },280);
+}
+
+/* =========================================================
+   11. MODAL DE REPUESTO (crear / editar)
+   ========================================================= */
+let editando = null;
+(function llenarCategorias(){
+  const s=$("#fCategoria");
+  CATEGORIAS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.nombre;s.appendChild(o)});
+})();
+
+function abrirNuevo(){
+  editando=null;
+  $("#tituloModal").textContent="Nuevo repuesto";
+  $("#btnGuardar").textContent="Guardar repuesto";
+  ["fNombre","fMarca","fModelo","fUbicacion","fProveedor"].forEach(id=>$("#"+id).value="");
+  $("#fCategoria").value=CATEGORIAS[0].id;
+  $("#fStock").value=0; $("#fMinimo").value=5; $("#fCosto").value=0; $("#fVenta").value=0;
+  limpiarAvisos();
+  abrir("#modalItem"); $("#fNombre").focus();
+}
+window.abrirNuevo = abrirNuevo;
+
+function abrirEditar(it){
+  editando=it;
+  $("#tituloModal").textContent="Editar repuesto";
+  $("#btnGuardar").textContent="Guardar cambios";
+  $("#fNombre").value=it.nombre; $("#fCategoria").value=it.catId; $("#fMarca").value=it.marca;
+  $("#fModelo").value=it.modelo; $("#fUbicacion").value=it.ubicacion; $("#fStock").value=it.stock;
+  $("#fMinimo").value=it.minimo; $("#fCosto").value=it.costo; $("#fVenta").value=it.precioVenta;
+  $("#fProveedor").value=it.proveedor;
+  limpiarAvisos();
+  abrir("#modalItem"); $("#fNombre").focus();
+}
+
+function limpiarAvisos(){$$("#modalItem .campo, #modalMov .campo").forEach(c=>c.classList.remove("mal"))}
+function marcarMal(id){$("#"+id).closest(".campo").classList.add("mal")}
+
+$("#btnGuardar").addEventListener("click",()=>{
+  limpiarAvisos();
+  const nombre=$("#fNombre").value.trim(), marca=$("#fMarca").value.trim();
+  const stock=parseInt($("#fStock").value,10), minimo=parseInt($("#fMinimo").value,10);
+  const costo=parseFloat($("#fCosto").value), venta=parseFloat($("#fVenta").value);
+  let mal=false;
+  if(!nombre){marcarMal("fNombre");mal=true}
+  if(!marca){marcarMal("fMarca");mal=true}
+  if(!Number.isFinite(stock)||stock<0){marcarMal("fStock");mal=true}
+  if(!Number.isFinite(minimo)||minimo<0){marcarMal("fMinimo");mal=true}
+  if(!Number.isFinite(costo)||costo<0){marcarMal("fCosto");mal=true}
+  if(!Number.isFinite(venta)||venta<0){marcarMal("fVenta");mal=true}
+  if(mal){avisar("Faltan datos por corregir en el formulario.","error");return}
+
+  const cat = CATEGORIAS.find(c=>c.id===$("#fCategoria").value);
+  const datos = {
+    nombre, categoria:cat.nombre, catId:cat.id, marca,
+    modelo:$("#fModelo").value.trim()||"Universal",
+    ubicacion:$("#fUbicacion").value.trim().toUpperCase()||cat.letra+"-00",
+    stock, minimo, costo, precioVenta:venta,
+    proveedor:$("#fProveedor").value.trim()||"Sin registrar"
+  };
+
+  if(editando){
+    const antes = editando.stock;
+    Object.assign(editando,datos);
+    if(antes!==stock){
+      movimientos.unshift({hora:new Date(),tipo:"ajuste",cant:stock,sku:editando.sku,nombre:editando.nombre,resultante:stock,nota:"Ajuste desde edición de ficha"});
+    }
+    cerrar("#modalItem"); pintar(false); destacar(editando.id); pintarMovimientos();
+    avisar(`${editando.nombre} se actualizó.`);
+  }else{
+    const nuevo = Object.assign({id:++contador, sku:cat.id.toUpperCase()+"-"+String(contador).padStart(4,"0")},datos);
+    items.unshift(nuevo);
+    movimientos.unshift({hora:new Date(),tipo:"entrada",cant:stock,sku:nuevo.sku,nombre:nuevo.nombre,resultante:stock,nota:"Alta de repuesto nuevo"});
+    // limpiar filtros para que el nuevo sea visible
+    estado.cat=""; estado.texto=""; $("#buscar").value=""; estado.estadoStock="todos";
+    $$(".chip").forEach(c=>c.setAttribute("aria-pressed", c.dataset.estado==="todos"));
+    estado.marca=""; $("#marcaFiltro").value="";
+    estado.campo="id"; estado.asc=true;
+    cerrar("#modalItem"); pintar(); llenarMarcas(); pintarMovimientos();
+    setTimeout(()=>destacar(nuevo.id),60);
+    avisar(`${nuevo.nombre} se agregó con código ${nuevo.sku}.`);
+  }
+});
+
+/* =========================================================
+   12. MODAL DE MOVIMIENTO
+   ========================================================= */
+let itemMov = null;
+function abrirMovimiento(it){
+  itemMov = it;
+  $("#movSub").textContent = `${it.nombre} · ${it.sku} · stock actual ${it.stock} unidades`;
+  $("#mvTipo").value="entrada"; $("#mvCant").value=1; $("#mvNota").value="";
+  limpiarAvisos(); actualizarEtiquetaCantidad();
+  abrir("#modalMov"); $("#mvCant").focus(); $("#mvCant").select();
+}
+function actualizarEtiquetaCantidad(){
+  const t=$("#mvTipo").value;
+  $("#lblCant").textContent = t==="ajuste" ? "Cantidad real contada en el estante" : "Cantidad";
+}
+$("#mvTipo").addEventListener("change",actualizarEtiquetaCantidad);
+
+$("#btnAplicarMov").addEventListener("click",()=>{
+  limpiarAvisos();
+  const cant = parseInt($("#mvCant").value,10);
+  const tipo = $("#mvTipo").value;
+  if(!Number.isFinite(cant)||cant<0||(tipo!=="ajuste"&&cant===0)){
+    $("#mvCant").closest(".campo").classList.add("mal");
+    return;
+  }
+  if(aplicar(itemMov,tipo,cant,$("#mvNota").value.trim())) cerrar("#modalMov");
+});
+
+/* =========================================================
+   13. MOVIMIENTOS
+   ========================================================= */
+function pintarMovimientos(){
+  const c=$("#cuerpoMovs"); c.innerHTML="";
+  $("#nMovs").textContent = movimientos.length;
+  const vacio = $("#sinMovs");
+  if(movimientos.length===0){vacio.classList.remove("oculto")} else {vacio.classList.add("oculto")}
+  movimientos.slice(0,300).forEach((m,i)=>{
+    const tr=document.createElement("tr");
+    if(i<15) {tr.className="entrando"; tr.style.setProperty("--i",i)}
+    const tag = m.tipo==="entrada"?'<span class="tag ent">Entrada</span>':m.tipo==="salida"?'<span class="tag sal">Salida</span>':'<span class="tag aju">Ajuste</span>';
+    tr.innerHTML = `
+      <td class="sku">${m.hora.toLocaleTimeString("es-PE",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</td>
+      <td>${tag}</td>
+      <td><div class="nombre">${esc(m.nombre)}</div><div class="meta">${m.sku}</div></td>
+      <td class="num">${m.tipo==="salida"?"−":m.tipo==="entrada"?"+":"="}${m.cant}</td>
+      <td class="num">${m.resultante}</td>
+      <td class="meta">${esc(m.nota)}</td>`;
+    c.appendChild(tr);
+  });
+  const ent = movimientos.filter(m=>m.tipo==="entrada").reduce((s,m)=>s+m.cant,0);
+  const sal = movimientos.filter(m=>m.tipo==="salida").reduce((s,m)=>s+m.cant,0);
+  contarHasta($("#mTotal"),movimientos.length);
+  contarHasta($("#mEnt"),ent);
+  contarHasta($("#mSal"),sal);
+  $("#pieMovs").innerHTML = movimientos.length
+    ? `<b>${movimientos.length}</b> movimientos listos para exportar`
+    : `El reporte se genera con los movimientos de esta sesión`;
+}
+
+/* =========================================================
+   14. CONTROLES SUPERIORES
+   ========================================================= */
+let temporizador;
+$("#buscar").addEventListener("input",e=>{
+  clearTimeout(temporizador);
+  temporizador = setTimeout(()=>{estado.texto=e.target.value.trim();estado.limite=40;estado.abierta=null;pintar()},180);
+});
+$$(".chip").forEach(ch=>ch.addEventListener("click",()=>{
+  $$(".chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+  ch.setAttribute("aria-pressed","true");
+  estado.estadoStock=ch.dataset.estado; estado.limite=40; estado.abierta=null; pintar();
+}));
+$("#marcaFiltro").addEventListener("change",e=>{estado.marca=e.target.value;estado.limite=40;pintar()});
+$$("th.orden").forEach(th=>th.addEventListener("click",()=>{
+  const c=th.dataset.campo;
+  if(estado.campo===c) estado.asc=!estado.asc; else {estado.campo=c;estado.asc=true}
+  $$("th.orden .flecha").forEach(f=>f.textContent="");
+  th.querySelector(".flecha").textContent = estado.asc?"▲":"▼";
+  estado.abierta=null; pintar();
+}));
+$("#btnMas").addEventListener("click",()=>{estado.limite+=40;pintar(false)});
+$("#btnNuevo").addEventListener("click",abrirNuevo);
+
+$$("nav button[data-vista]").forEach(b=>b.addEventListener("click",()=>{
+  $$("nav button[data-vista]").forEach(x=>x.classList.remove("activo"));
+  b.classList.add("activo");
+  estado.vista=b.dataset.vista;
+  $("#vistaInventario").classList.toggle("oculto",estado.vista!=="inventario");
+  $("#vistaMovimientos").classList.toggle("oculto",estado.vista!=="movimientos");
+  if(estado.vista==="movimientos") pintarMovimientos();
+}));
+
+function llenarMarcas(){
+  const s=$("#marcaFiltro"), actual=s.value;
+  const marcas=[...new Set(items.map(i=>i.marca))].sort((a,b)=>a.localeCompare(b,"es"));
+  s.innerHTML='<option value="">Todas las marcas</option>';
+  marcas.forEach(m=>{const o=document.createElement("option");o.value=m;o.textContent=m;s.appendChild(o)});
+  s.value=actual;
+}
+
+/* =========================================================
+   15. MODALES: abrir / cerrar
+   ========================================================= */
+function abrir(sel){$(sel).classList.add("abierto")}
+function cerrar(sel){$(sel).classList.remove("abierto")}
+$$("[data-cerrar]").forEach(b=>b.addEventListener("click",e=>cerrar("#"+e.target.closest(".fondo").id)));
+$$(".fondo").forEach(f=>f.addEventListener("click",e=>{if(e.target===f)cerrar("#"+f.id)}));
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$$(".fondo.abierto").forEach(f=>f.classList.remove("abierto"))});
+
+/* =========================================================
+   16. RESPALDO (el navegador no guarda solo: descarga y carga)
+   ========================================================= */
+$("#btnExportar").addEventListener("click",()=>{
+  const blob = new Blob([JSON.stringify({items,generado:new Date().toISOString()},null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="inventario-repuestos-"+new Date().toISOString().slice(0,10)+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+  avisar("Respaldo descargado. Guárdalo para no perder los cambios.");
+});
+$("#btnImportar").addEventListener("click",()=>$("#archivo").click());
+$("#archivo").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const lector=new FileReader();
+  lector.onload=()=>{
+    try{
+      const d=JSON.parse(lector.result);
+      if(!Array.isArray(d.items)) throw new Error("formato");
+      items=d.items; contador=Math.max(...items.map(i=>i.id),0);
+      estado.limite=40; estado.abierta=null;
+      pintar(); llenarMarcas();
+      avisar(`Respaldo cargado: ${items.length} repuestos.`);
+    }catch(err){
+      avisar("El archivo no tiene el formato del respaldo. Usa uno descargado desde aquí.","error");
+    }
+    e.target.value="";
+  };
+  lector.readAsText(f);
+});
+
+/* =========================================================
+   17. RELOJ LOCAL DEL NAVEGADOR
+   ========================================================= */
+function tic(){
+  const ahora = new Date();
+  const dos = n => String(n).padStart(2,"0");
+  $("#relojHora").innerHTML = `${dos(ahora.getHours())}:${dos(ahora.getMinutes())}<span class="seg">:${dos(ahora.getSeconds())}</span>`;
+  const f = ahora.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  $("#relojFecha").textContent = f.charAt(0).toUpperCase()+f.slice(1);
+}
+
+/* =========================================================
+   18. EXPORTAR MOVIMIENTOS A PDF
+   ========================================================= */
+function exportarPdf(){
+  if(movimientos.length===0){
+    avisar("Todavía no hay movimientos que exportar. Registra un ingreso o una venta primero.","alerta");
+    return;
+  }
+  const ahora = new Date();
+  const ent = movimientos.filter(m=>m.tipo==="entrada").reduce((s,m)=>s+m.cant,0);
+  const sal = movimientos.filter(m=>m.tipo==="salida").reduce((s,m)=>s+m.cant,0);
+  const aju = movimientos.filter(m=>m.tipo==="ajuste").length;
+
+  const filas = movimientos.slice().reverse().map((m,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td>${m.hora.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</td>
+      <td>${m.tipo==="entrada"?"Entrada":m.tipo==="salida"?"Salida":"Ajuste"}</td>
+      <td>${esc(m.sku)}</td>
+      <td>${esc(m.nombre)}</td>
+      <td style="text-align:right">${m.tipo==="salida"?"−":m.tipo==="entrada"?"+":"="}${m.cant}</td>
+      <td style="text-align:right">${m.resultante}</td>
+      <td>${esc(m.nota)}</td>
+    </tr>`).join("");
+
+  $("#impresion").innerHTML = `
+    <div class="doc-enc">
+      <h1>REPUESTOS EL SARCO</h1>
+      <div class="meta">Reporte de movimientos de inventario · emitido por Pablo ·
+        ${ahora.toLocaleDateString(undefined,{day:"2-digit",month:"long",year:"numeric"})},
+        ${ahora.toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"})}</div>
+    </div>
+    <div class="doc-res">
+      <div>Movimientos<b>${movimientos.length}</b></div>
+      <div>Unidades ingresadas<b>${ent}</b></div>
+      <div>Unidades de salida<b>${sal}</b></div>
+      <div>Ajustes por conteo<b>${aju}</b></div>
+      <div>Repuestos en catálogo<b>${items.length}</b></div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>#</th><th>Hora</th><th>Tipo</th><th>Código</th><th>Repuesto</th>
+        <th style="text-align:right">Cantidad</th><th style="text-align:right">Stock resultante</th><th>Nota</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div class="doc-pie">Los movimientos aparecen del más antiguo al más reciente.
+      El stock resultante es el que quedó registrado en el sistema justo después de cada movimiento.</div>`;
+
+  document.body.classList.add("imprimiendo");
+  avisar("En el cuadro de impresión elige «Guardar como PDF» como destino.");
+  setTimeout(()=>window.print(),350);
+}
+window.addEventListener("afterprint",()=>document.body.classList.remove("imprimiendo"));
+$("#btnPdfMovs").addEventListener("click",exportarPdf);
+
+/* =========================================================
+   19. ARRANQUE
+   ========================================================= */
+function iniciar(){
+  tic(); setInterval(tic,1000);
+  llenarMarcas();
+  pintar();
+  pintarMovimientos();
+  const criticos = items.filter(i=>i.stock===0).length;
+  setTimeout(()=>avisar(`Inventario cargado: ${items.length} repuestos en ${CATEGORIAS.length} categorías.`),400);
+  if(criticos) setTimeout(()=>avisar(`${criticos} repuestos están agotados. Filtra por "Agotados" para pedirlos.`,"alerta"),1400);
+}
+</script>
+</body>
+</html>
