@@ -347,6 +347,11 @@ tr.saliendo{animation:sale .3s ease forwards}
   .rejilla{grid-template-columns:1fr}
   main{padding:14px}
 }
+/* Solo celulares: reduce toda la interfaz un 12%. Tablets, laptops y
+   computadoras (>600px de ancho) quedan exactamente como estaban. */
+@media (max-width:600px){
+  body{zoom:.88}
+}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
