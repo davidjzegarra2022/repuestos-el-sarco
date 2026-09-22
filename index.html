@@ -252,6 +252,49 @@ tr.saliendo{animation:sale .3s ease forwards}
 @keyframes avisoEntra{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}
 @keyframes avisoSale{to{opacity:0;transform:translateX(26px)}}
 
+/* ============ CALCULADORA (widget flotante) ============ */
+.fab-calc{
+  position:fixed;left:18px;bottom:18px;z-index:80;
+  width:50px;height:50px;border-radius:50%;
+  background:var(--tinta);color:#fff;border:0;
+  display:grid;place-items:center;box-shadow:0 12px 28px -14px rgba(21,40,51,.7);
+  transition:background .14s,transform .14s;
+}
+.fab-calc:hover{background:#1f3542;transform:translateY(-2px)}
+.fab-calc:active{transform:scale(.93)}
+.fab-calc.activo{background:var(--ambar);color:var(--tinta)}
+.panel-calc{
+  position:fixed;left:18px;bottom:78px;z-index:80;width:250px;
+  background:var(--panel);border:1px solid var(--linea);border-top:4px solid var(--ambar);
+  box-shadow:0 18px 40px -20px rgba(21,40,51,.55);padding:12px;
+  transform:translateY(10px) scale(.97);opacity:0;pointer-events:none;
+  transition:transform .16s cubic-bezier(.2,.8,.25,1),opacity .16s;
+}
+.panel-calc.abierta{transform:none;opacity:1;pointer-events:auto}
+.calc-cab{display:flex;align-items:center;justify-content:space-between;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;margin-bottom:8px;color:var(--tinta-suave)}
+.calc-x{width:22px;height:22px;display:grid;place-items:center;border-radius:var(--r);font-size:16px;color:var(--tinta-suave)}
+.calc-x:hover{background:#F2F5F6;color:var(--tinta)}
+.calc-pantalla{background:#F2F5F6;border:1px solid var(--linea);border-radius:var(--r);padding:10px 12px;margin-bottom:10px;text-align:right;overflow:hidden}
+.calc-previa{font-size:12px;color:var(--tinta-suave);min-height:15px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.calc-actual{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.calc-teclas{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.calc-tecla{
+  height:40px;border:1px solid var(--linea);border-radius:var(--r);background:var(--panel);
+  font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:600;color:var(--tinta);
+  transition:background .12s,transform .1s;
+}
+.calc-tecla:hover{background:#F2F5F6}
+.calc-tecla:active{transform:scale(.93)}
+.calc-tecla.gris{color:var(--tinta-suave)}
+.calc-tecla.ambar{background:#FDF3D0;color:#9a7400;border-color:#F2E4A8}
+.calc-tecla.ambar:hover{background:var(--ambar);color:var(--tinta)}
+.calc-tecla.ancho{grid-column:span 2}
+.calc-tecla.igual{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+.calc-tecla.igual:hover{background:#1f3542}
+body:has(.fondo.abierto) .fab-calc,
+body:has(.fondo.abierto) .panel-calc{display:none}
+@media (max-width:340px){ .panel-calc{width:calc(100vw - 36px)} }
+
 /* ============ MOVIMIENTOS ============ */
 .tag{font-family:'Barlow Condensed',sans-serif;font-size:13px;padding:1px 8px;border-radius:99px;font-weight:600}
 .tag.ent{background:#E7F2ED;color:var(--verde)}
@@ -346,6 +389,11 @@ tr.saliendo{animation:sale .3s ease forwards}
   nav button.activo{border-color:var(--tinta)}
   .rejilla{grid-template-columns:1fr}
   main{padding:14px}
+}
+/* Solo celulares: reduce toda la interfaz un 12%. Tablets, laptops y
+   computadoras (>600px de ancho) quedan exactamente como estaban. */
+@media (max-width:600px){
+  body{zoom:.88}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
@@ -651,6 +699,55 @@ tr.saliendo{animation:sale .3s ease forwards}
 </div>
 
 <div id="avisos" aria-live="polite"></div>
+
+<!-- ===================== CALCULADORA (widget flotante) ===================== -->
+<button id="btnCalc" class="fab-calc" title="Calculadora" aria-label="Abrir calculadora" aria-expanded="false">
+  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+    <rect x="4" y="2" width="16" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <rect x="7" y="5" width="10" height="4.2" rx="1" fill="currentColor"/>
+    <circle cx="7.6" cy="13.3" r="1.15" fill="currentColor"/>
+    <circle cx="12" cy="13.3" r="1.15" fill="currentColor"/>
+    <circle cx="16.4" cy="13.3" r="1.15" fill="currentColor"/>
+    <circle cx="7.6" cy="17.3" r="1.15" fill="currentColor"/>
+    <circle cx="12" cy="17.3" r="1.15" fill="currentColor"/>
+    <circle cx="16.4" cy="17.3" r="1.15" fill="currentColor"/>
+  </svg>
+</button>
+<div id="panelCalc" class="panel-calc" role="dialog" aria-label="Calculadora" aria-hidden="true">
+  <div class="calc-cab">
+    <span>Calculadora</span>
+    <button id="btnCerrarCalc" class="calc-x" aria-label="Cerrar calculadora">×</button>
+  </div>
+  <div class="calc-pantalla">
+    <div class="calc-previa" id="calcPrevia"></div>
+    <div class="calc-actual" id="calcActual">0</div>
+  </div>
+  <div class="calc-teclas">
+    <button class="calc-tecla gris" data-accion="limpiar">C</button>
+    <button class="calc-tecla gris" data-accion="borrar">⌫</button>
+    <button class="calc-tecla gris" data-accion="porcentaje">%</button>
+    <button class="calc-tecla ambar" data-op="÷">÷</button>
+
+    <button class="calc-tecla" data-num="7">7</button>
+    <button class="calc-tecla" data-num="8">8</button>
+    <button class="calc-tecla" data-num="9">9</button>
+    <button class="calc-tecla ambar" data-op="×">×</button>
+
+    <button class="calc-tecla" data-num="4">4</button>
+    <button class="calc-tecla" data-num="5">5</button>
+    <button class="calc-tecla" data-num="6">6</button>
+    <button class="calc-tecla ambar" data-op="−">−</button>
+
+    <button class="calc-tecla" data-num="1">1</button>
+    <button class="calc-tecla" data-num="2">2</button>
+    <button class="calc-tecla" data-num="3">3</button>
+    <button class="calc-tecla ambar" data-op="+">+</button>
+
+    <button class="calc-tecla ancho" data-num="0">0</button>
+    <button class="calc-tecla" data-accion="punto">.</button>
+    <button class="calc-tecla igual" data-accion="igual">=</button>
+  </div>
+</div>
 
 <!-- ===================== MODAL CATEGORÍAS ===================== -->
 <div class="fondo" id="modalCats">
@@ -1382,7 +1479,88 @@ window.addEventListener("afterprint",()=>document.body.classList.remove("imprimi
 $("#btnPdfMovs").addEventListener("click",exportarPdf);
 
 /* =========================================================
-   19. ARRANQUE
+   19. CALCULADORA (widget independiente, no toca el inventario)
+   ========================================================= */
+(function(){
+  const btn=$("#btnCalc"), panel=$("#panelCalc");
+  const pantallaPrev=$("#calcPrevia"), pantallaAct=$("#calcActual");
+  let actual="0", previo=null, operador=null, reiniciar=false;
+
+  function refrescar(){
+    pantallaAct.textContent = actual;
+    pantallaPrev.textContent = previo!==null ? `${previo} ${operador}` : "";
+  }
+  function limpiar(){ actual="0"; previo=null; operador=null; reiniciar=false; refrescar(); }
+  function ingresarNumero(n){
+    actual = reiniciar || actual==="0" ? n : actual+n;
+    reiniciar=false;
+    if(actual.length>14) actual=actual.slice(0,14);
+    refrescar();
+  }
+  function ingresarPunto(){
+    if(reiniciar){ actual="0."; reiniciar=false; }
+    else if(!actual.includes(".")) actual+=".";
+    refrescar();
+  }
+  function borrar(){
+    actual = actual.length>1 ? actual.slice(0,-1) : "0";
+    refrescar();
+  }
+  function porcentaje(){
+    actual = formatear(parseFloat(actual)/100);
+    refrescar();
+  }
+  function formatear(n){
+    if(!Number.isFinite(n)) return "Error";
+    return String(Math.round(n*1e8)/1e8);
+  }
+  function calcular(a,b,op){
+    a=parseFloat(a); b=parseFloat(b);
+    if(op==="+") return a+b;
+    if(op==="−") return a-b;
+    if(op==="×") return a*b;
+    if(op==="÷") return b===0 ? NaN : a/b;
+    return b;
+  }
+  function elegirOperador(op){
+    if(operador!==null && !reiniciar) actual=formatear(calcular(previo,actual,operador));
+    previo=actual; operador=op; reiniciar=true;
+    refrescar();
+  }
+  function igual(){
+    if(operador===null) return;
+    actual=formatear(calcular(previo,actual,operador));
+    previo=null; operador=null; reiniciar=true;
+    refrescar();
+  }
+  panel.addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b) return;
+    if(b.dataset.num!==undefined) ingresarNumero(b.dataset.num);
+    else if(b.dataset.op) elegirOperador(b.dataset.op);
+    else if(b.dataset.accion==="limpiar") limpiar();
+    else if(b.dataset.accion==="borrar") borrar();
+    else if(b.dataset.accion==="porcentaje") porcentaje();
+    else if(b.dataset.accion==="punto") ingresarPunto();
+    else if(b.dataset.accion==="igual") igual();
+  });
+  function abrirCalc(){
+    panel.classList.add("abierta"); panel.setAttribute("aria-hidden","false");
+    btn.classList.add("activo"); btn.setAttribute("aria-expanded","true");
+  }
+  function cerrarCalc(){
+    panel.classList.remove("abierta"); panel.setAttribute("aria-hidden","true");
+    btn.classList.remove("activo"); btn.setAttribute("aria-expanded","false");
+  }
+  btn.addEventListener("click",()=>panel.classList.contains("abierta")?cerrarCalc():abrirCalc());
+  $("#btnCerrarCalc").addEventListener("click",cerrarCalc);
+  document.addEventListener("click",e=>{
+    if(panel.classList.contains("abierta") && !panel.contains(e.target) && !btn.contains(e.target)) cerrarCalc();
+  });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape") cerrarCalc(); });
+})();
+
+/* =========================================================
+   20. ARRANQUE
    ========================================================= */
 function iniciar(){
   tic(); setInterval(tic,1000);
