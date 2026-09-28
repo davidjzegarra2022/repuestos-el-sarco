@@ -535,6 +535,7 @@ body:has(.fondo.abierto) .panel-calc{display:none}
         <button class="chip" data-estado="ok" aria-pressed="false">Stock sano</button>
         <button class="chip" data-estado="bajo" aria-pressed="false">Bajo mínimo</button>
         <button class="chip" data-estado="cero" aria-pressed="false">Agotados</button>
+        <button class="chip" data-estado="pendiente" aria-pressed="false">Pendientes</button>
         <select class="filtro" id="marcaFiltro"><option value="">Todas las marcas</option></select>
         <span class="sep"></span>
         <button class="btn claro" id="btnExportar">Descargar respaldo</button>
@@ -660,6 +661,14 @@ body:has(.fondo.abierto) .panel-calc{display:none}
       <div class="campo full">
         <label for="fProveedor">Proveedor</label>
         <input id="fProveedor" placeholder="Ej. Importaciones Mesa Redonda">
+      </div>
+      <div class="campo full">
+        <label for="fNotas">Notas</label>
+        <textarea id="fNotas" rows="2" style="width:100%;padding:7px 10px;border:1px solid var(--linea);border-radius:var(--r);background:#FBFCFC;font:inherit;resize:vertical" placeholder="Ej. precio sin asignar, código por confirmar…"></textarea>
+      </div>
+      <div class="campo full" style="flex-direction:row;align-items:center;gap:8px">
+        <input id="fPendiente" type="checkbox" style="width:16px;height:16px">
+        <label for="fPendiente" style="margin:0">Marcar como pendiente de revisión (código, precio o cantidad por confirmar)</label>
       </div>
     </div>
     <div class="pie">
@@ -806,7 +815,7 @@ function filaAItem(p){
     marca:p.marca, modelo:p.modelo, unidad:p.unidad, ubicacion:p.ubicacion,
     stock:Number(p.stock), minimo:Number(p.minimo), costo:Number(p.costo),
     precioVenta:Number(p.precio_venta), precioMecanico:Number(p.precio_mecanico),
-    proveedor:p.proveedor
+    proveedor:p.proveedor, pendiente:!!p.pendiente, notas:p.notas||""
   };
 }
 function itemAFila(it){
@@ -814,7 +823,7 @@ function itemAFila(it){
     sku:it.sku, nombre:it.nombre, cat_id:it.catId, marca:it.marca, modelo:it.modelo,
     unidad:it.unidad, ubicacion:it.ubicacion, stock:it.stock, minimo:it.minimo,
     costo:it.costo, precio_venta:it.precioVenta, precio_mecanico:it.precioMecanico,
-    proveedor:it.proveedor
+    proveedor:it.proveedor, pendiente:!!it.pendiente, notas:it.notas||""
   };
 }
 
@@ -912,7 +921,8 @@ function filtrados(){
   let r = items.filter(it=>{
     if(estado.cat && it.catId!==estado.cat) return false;
     if(estado.marca && it.marca!==estado.marca) return false;
-    if(estado.estadoStock!=="todos" && nivel(it)!==estado.estadoStock) return false;
+    if(estado.estadoStock==="pendiente"){ if(!it.pendiente) return false; }
+    else if(estado.estadoStock!=="todos" && nivel(it)!==estado.estadoStock) return false;
     if(t && !(it.nombre+" "+it.sku+" "+it.marca+" "+it.modelo+" "+it.categoria+" "+it.ubicacion).toLowerCase().includes(t)) return false;
     return true;
   });
@@ -946,7 +956,7 @@ function pintar(animar=true){
     const pct = Math.min(100, it.stock===0?0:Math.max(6,(it.stock/Math.max(it.minimo*4,12))*100));
     tr.innerHTML = `
       <td class="sku">${it.sku}</td>
-      <td><div class="nombre">${esc(it.nombre)}</div><div class="meta">${esc(it.marca)}${it.modelo?" · "+esc(it.modelo):""} · se vende por ${esc(it.unidad||"unidad")}</div></td>
+      <td><div class="nombre">${esc(it.nombre)}${it.pendiente?' <span class="tag aju" title="Código, precio o cantidad por confirmar">Pendiente</span>':''}</div><div class="meta">${esc(it.marca)}${it.modelo?" · "+esc(it.modelo):""} · se vende por ${esc(it.unidad||"unidad")}</div></td>
       <td>${esc(it.categoria)}</td>
       <td><span class="ubic">${esc(it.ubicacion)}</span></td>
       <td class="num" style="text-align:right">${soles(it.precioVenta)}</td>
@@ -1003,6 +1013,7 @@ function filaDetalle(it){
     <div class="dato"><div class="et">Precio para mecánicos</div><div class="vv">${it.precioMecanico?soles(it.precioMecanico):"No definido"}</div></div>
     <div class="dato"><div class="et">Unidad de venta</div><div class="vv">${esc(it.unidad||"unidad")}</div></div>
     <div class="dato"><div class="et">Estado</div><div class="vv">${it.stock===0?"Agotado, reponer ya":it.stock<=it.minimo?"Bajo el mínimo":"Stock sano"}</div></div>
+    ${it.notas?`<div class="dato" style="grid-column:1/-1"><div class="et">Notas</div><div class="vv">${esc(it.notas)}</div></div>`:""}
   </div></td>`;
   return tr;
 }
@@ -1204,10 +1215,10 @@ function abrirNuevo(){
   editando=null;
   $("#tituloModal").textContent="Nuevo repuesto";
   $("#btnGuardar").textContent="Guardar repuesto";
-  ["fNombre","fMarca","fModelo","fUbicacion","fProveedor"].forEach(id=>$("#"+id).value="");
+  ["fNombre","fMarca","fModelo","fUbicacion","fProveedor","fNotas"].forEach(id=>$("#"+id).value="");
   $("#fCategoria").value=CATEGORIAS[0].id;
   $("#fStock").value=0; $("#fMinimo").value=5; $("#fCosto").value=0; $("#fVenta").value=0;
-  $("#fMecanico").value=0; $("#fUnidad").value="unidad";
+  $("#fMecanico").value=0; $("#fUnidad").value="unidad"; $("#fPendiente").checked=false;
   llenarSelectCategorias();
   limpiarAvisos();
   abrir("#modalItem"); $("#fNombre").focus();
@@ -1223,6 +1234,7 @@ function abrirEditar(it){
   $("#fMinimo").value=it.minimo; $("#fCosto").value=it.costo; $("#fVenta").value=it.precioVenta;
   $("#fProveedor").value=it.proveedor;
   $("#fMecanico").value=it.precioMecanico||0; $("#fUnidad").value=it.unidad||"unidad";
+  $("#fNotas").value=it.notas||""; $("#fPendiente").checked=!!it.pendiente;
   llenarSelectCategorias(); $("#fCategoria").value=it.catId;
   limpiarAvisos();
   abrir("#modalItem"); $("#fNombre").focus();
@@ -1254,7 +1266,8 @@ $("#btnGuardar").addEventListener("click",async ()=>{
     ubicacion:$("#fUbicacion").value.trim().toUpperCase()||cat.letra+"-00",
     stock, minimo, costo, precioVenta:venta, precioMecanico:mecanico,
     unidad:$("#fUnidad").value,
-    proveedor:$("#fProveedor").value.trim()||"Sin registrar"
+    proveedor:$("#fProveedor").value.trim()||"Sin registrar",
+    notas:$("#fNotas").value.trim(), pendiente:$("#fPendiente").checked
   };
 
   const {data:{user}} = await sb.auth.getUser();
