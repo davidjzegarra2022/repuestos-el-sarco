@@ -888,11 +888,11 @@ sb.auth.getSession().then(({data:{session}})=>{
 /* =========================================================
    5. AVISOS FLOTANTES
    ========================================================= */
-function avisar(texto,tipo=""){
+function avisar(texto,tipo="",duracion=3000){
   const d=document.createElement("div");
   d.className="aviso-f "+tipo; d.textContent=texto;
   $("#avisos").appendChild(d);
-  setTimeout(()=>{d.classList.add("sale");setTimeout(()=>d.remove(),280)},3000);
+  setTimeout(()=>{d.classList.add("sale");setTimeout(()=>d.remove(),280)},duracion);
 }
 
 /* =========================================================
@@ -1581,8 +1581,10 @@ function iniciar(){
   pintar();
   pintarMovimientos();
   const criticos = items.filter(i=>i.stock===0).length;
+  const bajos = items.filter(i=>nivel(i)==="bajo").length;
   setTimeout(()=>avisar(`Inventario cargado: ${items.length} repuestos en ${CATEGORIAS.length} categorías.`),400);
   if(criticos) setTimeout(()=>avisar(`${criticos} repuestos están agotados. Filtra por "Agotados" para pedirlos.`,"alerta"),1400);
+  if(bajos) setTimeout(()=>avisar(`${bajos} repuestos tienen poco stock (bajo el mínimo). Filtra por "Bajo mínimo" para reponerlos.`,"alerta",18000),2400);
 }
 </script>
 </body>
