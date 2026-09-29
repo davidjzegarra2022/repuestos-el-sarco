@@ -134,6 +134,11 @@ nav button:hover{background:#F2F5F6}
 nav button.activo{background:#F2F5F6;border-left-color:var(--ambar);font-weight:600}
 nav button .n{font-family:'Barlow Condensed',sans-serif;font-size:13px;color:var(--tinta-suave);font-variant-numeric:tabular-nums}
 .nav-sep{height:1px;background:var(--linea);margin:12px 16px}
+.punto-cat{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;flex:none}
+.pildora-cat{
+  display:inline-flex;align-items:center;padding:2px 9px;border-radius:99px;
+  font-size:12px;font-weight:600;white-space:nowrap;
+}
 
 main{padding:20px;overflow-x:hidden}
 
@@ -808,6 +813,19 @@ let movimientos = [];
 let contador = 0;
 function nombreCat(id){const c=CATEGORIAS.find(c=>c.id===id);return c?c.nombre:"Sin categoría"}
 
+/* ---- Color por categoría: cada sección se agrupa visualmente por su propio color ---- */
+const COLORES_CAT = {
+  ilu:198, ele:214, mot:18, tra:266, fre:344, car:172, lub:78, fil:28, fer:206, var:0
+};
+function tonoCat(id){
+  if(id in COLORES_CAT) return COLORES_CAT[id];
+  let hash=0; for(let i=0;i<id.length;i++) hash=(hash*31+id.charCodeAt(i))>>>0;
+  return hash%360;
+}
+function colorCat(id){ return id==="var" ? "hsl(0 0% 38%)" : `hsl(${tonoCat(id)} 60% 34%)`; }
+function colorCatFondo(id){ return id==="var" ? "hsl(0 0% 92%)" : `hsl(${tonoCat(id)} 68% 94%)`; }
+function colorCatPunto(id){ return id==="var" ? "hsl(0 0% 55%)" : `hsl(${tonoCat(id)} 55% 48%)`; }
+
 /* ---- Traducción entre las filas de Supabase (snake_case) y el modelo de la app ---- */
 function filaAItem(p){
   return {
@@ -957,7 +975,7 @@ function pintar(animar=true){
     tr.innerHTML = `
       <td class="sku">${it.sku}</td>
       <td><div class="nombre">${esc(it.nombre)}${it.pendiente?' <span class="tag aju" title="Código, precio o cantidad por confirmar">Pendiente</span>':''}</div><div class="meta">${esc(it.marca)}${it.modelo?" · "+esc(it.modelo):""} · se vende por ${esc(it.unidad||"unidad")}</div></td>
-      <td>${esc(it.categoria)}</td>
+      <td><span class="pildora-cat" style="background:${colorCatFondo(it.catId)};color:${colorCat(it.catId)}">${esc(it.categoria)}</span></td>
       <td><span class="ubic">${esc(it.ubicacion)}</span></td>
       <td class="num" style="text-align:right">${soles(it.precioVenta)}</td>
       <td>
@@ -1053,7 +1071,7 @@ function construirNav(){
   CATEGORIAS.forEach(c=>{
     const b=document.createElement("button");
     b.dataset.cat=c.id;
-    b.innerHTML = `<span>${esc(c.nombre)}</span><span class="n">0</span>`;
+    b.innerHTML = `<span><i class="punto-cat" style="background:${colorCatPunto(c.id)}"></i>${esc(c.nombre)}</span><span class="n">0</span>`;
     cont.appendChild(b);
   });
 }
@@ -1069,8 +1087,10 @@ function pintarGestorCats(){
     const usados = items.filter(i=>i.catId===cat.id).length;
     const tr=document.createElement("tr");
     tr.innerHTML = `
-      <td><input value="${esc(cat.nombre)}" data-id="${cat.id}" class="renombra"
-           style="width:100%;padding:5px 8px;border:1px solid var(--linea);border-radius:3px;background:#FBFCFC"></td>
+      <td style="display:flex;align-items:center;gap:8px">
+        <i class="punto-cat" style="background:${colorCatPunto(cat.id)}" title="Color de esta categoría"></i>
+        <input value="${esc(cat.nombre)}" data-id="${cat.id}" class="renombra"
+           style="flex:1;padding:5px 8px;border:1px solid var(--linea);border-radius:3px;background:#FBFCFC"></td>
       <td class="sku">${esc(cat.letra)}</td>
       <td class="num" style="text-align:right">${usados}</td>
       <td style="text-align:right"><button class="mini" data-borra="${cat.id}"
