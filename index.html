@@ -244,6 +244,17 @@ tr.saliendo{animation:sale .3s ease forwards}
 .campo.mal input,.campo.mal select{border-color:var(--rojo);background:#FDF5F4}
 .campo.mal .aviso{display:block}
 
+/* ============ ESCÁNER ============ */
+#escVideoCaja{position:relative;background:#101820;border-radius:var(--r);overflow:hidden;aspect-ratio:4/3}
+#escLector{width:100%;height:100%}
+#escLector video{width:100%;height:100%;object-fit:cover}
+#escResultado{background:#F7F9FA;border:1px solid var(--linea);border-radius:var(--r);padding:12px 14px;margin-top:14px}
+#escResultado .nombre{font-weight:600;font-size:15px}
+#escResultado .meta{font-size:12.5px;color:var(--tinta-suave);margin-top:2px}
+#escResultado .acciones-esc{display:flex;gap:8px;margin-top:12px}
+#escResultado .acciones-esc .btn{flex:1}
+#escResultado .btn.ancho{margin-top:8px}
+
 /* ============ AVISOS FLOTANTES ============ */
 #avisos{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:9px;z-index:80}
 .aviso-f{
@@ -535,6 +546,7 @@ body:has(.fondo.abierto) .panel-calc{display:none}
 
       <div class="barra-herr">
         <button class="btn ambar" id="btnNuevo">+ Nuevo repuesto</button>
+        <button class="btn claro" id="btnEscanear">Escanear código</button>
         <button class="btn claro" id="btnCats">Categorías</button>
         <button class="chip" data-estado="todos" aria-pressed="true">Todos</button>
         <button class="chip" data-estado="ok" aria-pressed="false">Stock sano</button>
@@ -712,6 +724,22 @@ body:has(.fondo.abierto) .panel-calc{display:none}
   </div>
 </div>
 
+<!-- ===================== MODAL ESCÁNER ===================== -->
+<div class="fondo" id="modalEscaner">
+  <div class="modal" style="max-width:420px" role="dialog" aria-modal="true">
+    <h2>Escanear código</h2>
+    <p class="sub">Apunta la cámara al código de barras o QR del repuesto.</p>
+    <div id="escVideoCaja">
+      <div id="escLector"></div>
+    </div>
+    <p class="aviso" id="escError" style="display:none;margin-top:10px"></p>
+    <div id="escResultado" class="oculto"></div>
+    <div class="pie">
+      <button class="btn claro" data-cerrar>Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div id="avisos" aria-live="polite"></div>
 
 <!-- ===================== CALCULADORA (widget flotante) ===================== -->
@@ -798,6 +826,7 @@ body:has(.fondo.abierto) .panel-calc{display:none}
 <!-- La clave publicable es segura de exponer: el acceso real lo controla
      Row Level Security en la base de datos (solo usuarios autenticados). -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="config.js"></script>
 <script>
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
@@ -1593,7 +1622,73 @@ $("#btnPdfMovs").addEventListener("click",exportarPdf);
 })();
 
 /* =========================================================
-   20. ARRANQUE
+   20. ESCÁNER DE CÓDIGOS (cámara → busca por SKU)
+   ========================================================= */
+let escanerActivo = null;
+
+async function iniciarEscaner(){
+  $("#escResultado").classList.add("oculto"); $("#escResultado").innerHTML="";
+  $("#escError").style.display="none";
+  abrir("#modalEscaner");
+  try{
+    escanerActivo = new Html5Qrcode("escLector");
+    await escanerActivo.start(
+      {facingMode:"environment"},
+      {fps:10, qrbox:{width:240,height:140}},
+      onEscaneoOk,
+      ()=>{}
+    );
+  }catch(err){
+    $("#escError").style.display="block";
+    $("#escError").textContent = "No se pudo acceder a la cámara. Revisa los permisos del navegador y vuelve a intentar.";
+  }
+}
+async function detenerEscaner(){
+  if(escanerActivo){
+    try{ await escanerActivo.stop(); escanerActivo.clear(); }catch(e){}
+    escanerActivo = null;
+  }
+}
+function onEscaneoOk(texto){
+  const codigo = String(texto).trim();
+  const it = items.find(i=>i.sku.toLowerCase()===codigo.toLowerCase());
+  if(!it){
+    $("#escError").style.display="block";
+    $("#escError").textContent = `Código no reconocido: "${codigo}". Sigue apuntando o ciérralo y búscalo manualmente.`;
+    return;
+  }
+  detenerEscaner();
+  $("#escError").style.display="none";
+  $("#escResultado").classList.remove("oculto");
+  $("#escResultado").innerHTML = `
+    <div class="nombre">${esc(it.nombre)}</div>
+    <div class="meta">${esc(it.sku)} · stock actual <b>${it.stock}</b> ${esc(it.unidad||"unidad")}</div>
+    <div class="acciones-esc">
+      <button class="btn claro" id="btnEscSalida">− Salida rápida</button>
+      <button class="btn ambar" id="btnEscEntrada">+ Entrada rápida</button>
+    </div>
+    <button class="btn claro ancho" id="btnEscMovCompleto">Movimiento con cantidad distinta…</button>
+  `;
+  $("#btnEscSalida").addEventListener("click",async ()=>{
+    if(await aplicar(it,"salida",1,"Salida por escáner")) cerrar("#modalEscaner");
+  });
+  $("#btnEscEntrada").addEventListener("click",async ()=>{
+    if(await aplicar(it,"entrada",1,"Ingreso por escáner")) cerrar("#modalEscaner");
+  });
+  $("#btnEscMovCompleto").addEventListener("click",()=>{
+    cerrar("#modalEscaner");
+    abrirMovimiento(it);
+  });
+}
+$("#btnEscanear").addEventListener("click",iniciarEscaner);
+$$("#modalEscaner [data-cerrar]").forEach(b=>b.addEventListener("click",detenerEscaner));
+$("#modalEscaner").addEventListener("click",e=>{ if(e.target.id==="modalEscaner") detenerEscaner(); });
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape" && $("#modalEscaner").classList.contains("abierto")) detenerEscaner();
+});
+
+/* =========================================================
+   21. ARRANQUE
    ========================================================= */
 function iniciar(){
   tic(); setInterval(tic,1000);
